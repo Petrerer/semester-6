@@ -1,0 +1,57 @@
+Terminal 1 — symulator:
+bash
+
+cd ~/Downloads/fsds_bin
+xhost +local:root
+docker compose up
+
+Terminal 2 — bridge:
+bash
+
+cd ~/Downloads/fsds_bin
+docker compose exec fsds-ros2 bash
+source /opt/ros/humble/setup.bash
+source /ros2_ws/install/setup.bash
+ros2 launch fsds_ros2_bridge fsds_ros2_bridge.launch.py
+
+Terminal 3 — sine steering:
+bash
+
+cd ~/Downloads/fsds_bin
+docker compose exec fsds-ros2 bash
+source /opt/ros/humble/setup.bash
+source /ros2_ws/install/setup.bash
+ros2 run sine_steering sine_steering_node
+
+Pamiętaj żeby w symulatorze kliknąć Start/wybrać tor zanim odpalisz terminal 2 i 3.
+
+cat > /ros2_ws/src/sine_steering/sine_steering/sine_steering_node.py << 'EOF'
+import rclpy
+from fs_msgs.msg import ControlCommand
+import math
+
+rclpy.init()
+node = rclpy.create_node('n')
+pub = node.create_publisher(ControlCommand, '/fsds/control_command', 10)
+t = 0.0
+elapsed = 0.0
+dt = 0.05
+
+def cb():
+    global t, elapsed
+    msg = ControlCommand()
+    if elapsed >= 13.0:
+        msg.throttle = 0.0
+        msg.steering = 0.0
+        msg.brake = 1.0
+    else:
+        msg.throttle = (math.sin(t) + 1) / 2 * 0.3
+        msg.steering = 0.0
+        msg.brake = 0.0
+        t = (t + 0.15) % (2 * math.pi)
+        elapsed += dt
+    pub.publish(msg)
+
+node.create_timer(dt, cb)
+rclpy.spin(node)
+EOF
